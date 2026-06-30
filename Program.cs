@@ -1,3 +1,5 @@
+using RabbitMQ.Client;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -5,6 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+var factory = new ConnectionFactory
+{
+    HostName = "localhost",
+    UserName = "admin",
+    Password = "admin123"
+};
+IConnection connection = await factory.CreateConnectionAsync();
+
+builder.Services.AddSingleton<IConnection>(connection);
+builder.Services.AddSingleton<IRabbitMqProducer, RabbitMqProducer>();
+builder.Services.AddSingleton<IProductsProducer, ProductsProducer>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
