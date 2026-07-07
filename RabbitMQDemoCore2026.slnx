@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="../RabbitMQDemoCore2026.Domain/RabbitMQDemoCore2026.Domain.csproj" />
-  <Project Path="../RabbitMQDemoCore2026.Worker/RabbitMQDemoCore2026.Worker.csproj" />
-  <Project Path="RabbitMQDemoCore2026.csproj" />
+  <Project Path="RabbitMQDemoCore2026.Api/RabbitMQDemoCore2026.Api.csproj" />
+  <Project Path="RabbitMQDemoCore2026.Domain/RabbitMQDemoCore2026.Domain.csproj" />
+  <Project Path="RabbitMQDemoCore2026.Worker/RabbitMQDemoCore2026.Worker.csproj" />
 </Solution>
