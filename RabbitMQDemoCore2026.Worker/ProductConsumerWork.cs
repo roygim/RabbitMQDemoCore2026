@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQDemoCore2026.Domain.Entities;
+using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -10,31 +11,21 @@ using System.Threading.Channels;
 namespace RabbitMQDemoCore2026.Worker;
 
 public class ProductConsumerWork(
-    ILogger<ProductConsumerWork> logger) : BackgroundService
+    ILogger<ProductConsumerWork> logger,
+    IRabbitMqConnection rabbitMq) : BackgroundService
 {
-    private IConnection? _connection;
-    private IChannel? _channel;
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
-        var factory = new ConnectionFactory
-        {
-            HostName = "localhost",
-            UserName = "admin",
-            Password = "admin123"
-        };
+        var channel = await rabbitMq.CreateChannelAsync();
 
-        _connection = await factory.CreateConnectionAsync();
-
-        _channel = await _connection.CreateChannelAsync();
-
-        await _channel.QueueDeclareAsync(
-            queue: "products_queue",
+        await channel.QueueDeclareAsync(
+            "products_queue",
             durable: true,
             exclusive: false,
             autoDelete: false);
 
-        var consumer = new AsyncEventingBasicConsumer(_channel);
+        var consumer = new AsyncEventingBasicConsumer(channel);
 
         consumer.ReceivedAsync += async (sender, args) =>
         {
@@ -45,14 +36,15 @@ public class ProductConsumerWork(
                 var product = JsonSerializer.Deserialize<Product>(json);
 
                 logger.LogInformation(
-                    "Product received: Id={Id}, Name={Name}, Price={Price}",
+                    "Product received: Id={Id}, Name={Name}, Price={Price}, Category={CategoryName}",
                     product?.Id,
                     product?.Name,
-                    product?.Price);
+                    product?.Price,
+                    product?.CategoryName);
 
                 // todo - save product to database or perform other processing
 
-                await _channel.BasicAckAsync(
+                await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
                     multiple: false);
             }
@@ -62,32 +54,20 @@ public class ProductConsumerWork(
                     ex,
                     "Error processing product message");
 
-                await _channel.BasicNackAsync(
+                await channel.BasicNackAsync(
                     deliveryTag: args.DeliveryTag,
                     multiple: false,
                     requeue: true);
             }
         };
 
-        await _channel.BasicConsumeAsync(
-            queue: "products_queue",
-            autoAck: false,
-            consumer: consumer);
+        await channel.BasicConsumeAsync(
+            "products_queue",
+            false,
+            consumer);
 
-        logger.LogInformation(
-            "Product consumer started");
-
-        await Task.Delay(Timeout.Infinite, stoppingToken);
-    }
-
-    public override async void Dispose()
-    {
-        if (_channel != null)
-            await _channel.DisposeAsync();
-
-        if (_connection != null)
-            await _connection.DisposeAsync();
-
-        base.Dispose();
+        await Task.Delay(
+            Timeout.Infinite,
+            stoppingToken);
     }
 }
