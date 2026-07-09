@@ -24,11 +24,40 @@ public class ProductConsumerWork(
     {
         var channel = await rabbitMq.CreateChannelAsync();
 
+        await channel.ExchangeDeclareAsync(
+            exchange: "products.dlx",
+            type: ExchangeType.Direct,
+            durable: true);
+
+        await channel.QueueDeclareAsync(
+            queue: "products_dead_queue",
+            durable: true,
+            exclusive: false,
+            autoDelete: false);
+
+        await channel.QueueBindAsync(
+            queue: "products_dead_queue",
+            exchange: "products.dlx",
+            routingKey: "products.failed");
+
+        var arguments = new Dictionary<string, object?>
+            {
+                {
+                    "x-dead-letter-exchange",
+                    "products.dlx"
+                },
+                {
+                    "x-dead-letter-routing-key",
+                    "products.failed"
+                }
+            };
+
         await channel.QueueDeclareAsync(
             _rabbitMqOptions.ProductsQueue,
             durable: true,
             exclusive: false,
-            autoDelete: false);
+            autoDelete: false,
+            arguments: arguments);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
 
@@ -48,6 +77,13 @@ public class ProductConsumerWork(
                     product?.CategoryName);
 
                 // todo - save product to database or perform other processing
+                
+                bool simulateError = true;
+
+                if (simulateError)
+                {
+                    throw new Exception("DB failed intentionally");
+                }
 
                 await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
@@ -62,7 +98,7 @@ public class ProductConsumerWork(
                 await channel.BasicNackAsync(
                     deliveryTag: args.DeliveryTag,
                     multiple: false,
-                    requeue: true);
+                    requeue: false);
             }
         };
 

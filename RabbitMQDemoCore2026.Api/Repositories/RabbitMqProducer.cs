@@ -30,15 +30,8 @@ public class RabbitMqProducer : IRabbitMqProducer
     {
         using var channel = await _connection.CreateChannelAsync();
 
-        await channel.QueueDeclareAsync(
-            queue: queue,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null
-        );
-
         var json = JsonSerializer.Serialize(message);
+        
         var body = Encoding.UTF8.GetBytes(json);
 
         var props = new BasicProperties
