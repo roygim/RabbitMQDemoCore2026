@@ -26,7 +26,10 @@ public class RabbitMqProducer : IRabbitMqProducer
         _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
     }
 
-    public async Task PublishAsync<T>(string queue, T message)
+    public async Task PublishAsync<T>(
+        string exchange,
+        string routingKey,
+        T message)
     {
         using var channel = await _connection.CreateChannelAsync();
 
@@ -40,8 +43,8 @@ public class RabbitMqProducer : IRabbitMqProducer
         };
 
         await channel.BasicPublishAsync(
-            exchange: "",
-            routingKey: queue,
+            exchange: exchange,
+            routingKey: routingKey,
             mandatory: false,
             basicProperties: props,
             body: body

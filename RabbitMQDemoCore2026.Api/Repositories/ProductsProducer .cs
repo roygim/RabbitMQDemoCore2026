@@ -16,7 +16,11 @@ namespace RabbitMQDemoCore2026.Repositories
 
         public async Task PublishAsync(Product product)
         {
-            await _producer.PublishAsync(_options.Value.ProductsQueue, product);
+            //await _producer.PublishAsync(_options.Value.ProductsQueue, product);
+            await _producer.PublishAsync(
+                "products.exchange",
+                "product.created",
+                product);
         }
     }
 }

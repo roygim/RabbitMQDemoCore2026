@@ -8,7 +8,6 @@ using RabbitMQDemoCore2026.Infrastructure.Configuration;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Channels;
 
 namespace RabbitMQDemoCore2026.Worker;
 
@@ -19,71 +18,179 @@ public class ProductConsumerWork(
 {
     private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
 
+    private const string Exchange = "products.exchange";
+    private const string Queue = "products_queue";
+
+    private const string RetryExchange = "products.retry.exchange";
+    private const string RetryQueue = "products_retry_queue";
+
+    private const string DeadExchange = "products.dlx";
+    private const string DeadQueue = "products_dead_queue";
+
+    private const int MaxRetries = 3;
+
+
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
         var channel = await rabbitMq.CreateChannelAsync();
 
+
+        /*
+         * Exchanges
+         */
+
         await channel.ExchangeDeclareAsync(
-            exchange: "products.dlx",
+            exchange: Exchange,
+            type: ExchangeType.Topic,
+            durable: true);
+
+
+        await channel.ExchangeDeclareAsync(
+            exchange: RetryExchange,
             type: ExchangeType.Direct,
             durable: true);
 
+
+        await channel.ExchangeDeclareAsync(
+            exchange: DeadExchange,
+            type: ExchangeType.Direct,
+            durable: true);
+
+
+
+        /*
+         * Dead Letter Queue
+         */
+
         await channel.QueueDeclareAsync(
-            queue: "products_dead_queue",
+            queue: DeadQueue,
             durable: true,
             exclusive: false,
             autoDelete: false);
 
-        await channel.QueueBindAsync(
-            queue: "products_dead_queue",
-            exchange: "products.dlx",
-            routingKey: "products.failed");
 
-        var arguments = new Dictionary<string, object?>
-            {
-                {
-                    "x-dead-letter-exchange",
-                    "products.dlx"
-                },
-                {
-                    "x-dead-letter-routing-key",
-                    "products.failed"
-                }
-            };
+        await channel.QueueBindAsync(
+            queue: DeadQueue,
+            exchange: DeadExchange,
+            routingKey: "product.failed");
+
+
+
+        /*
+         * Retry Queue
+         */
 
         await channel.QueueDeclareAsync(
-            _rabbitMqOptions.ProductsQueue,
+            queue: RetryQueue,
             durable: true,
             exclusive: false,
             autoDelete: false,
-            arguments: arguments);
+            arguments: new Dictionary<string, object?>
+            {
+                {
+                    "x-message-ttl",
+                    10000 // 10 seconds
+                },
+                {
+                    "x-dead-letter-exchange",
+                    Exchange
+                },
+                {
+                    "x-dead-letter-routing-key",
+                    "product.retry"
+                }
+            });
 
-        var consumer = new AsyncEventingBasicConsumer(channel);
 
-        consumer.ReceivedAsync += async (sender, args) =>
+        await channel.QueueBindAsync(
+            queue: RetryQueue,
+            exchange: RetryExchange,
+            routingKey: "product.retry");
+
+
+
+        /*
+         * Main Queue
+         */
+
+        await channel.QueueDeclareAsync(
+            queue: Queue,
+            durable: true,
+            exclusive: false,
+            autoDelete: false);
+
+
+        await channel.QueueBindAsync(
+            queue: Queue,
+            exchange: Exchange,
+            routingKey: "product.created");
+
+
+        await channel.QueueBindAsync(
+            queue: Queue,
+            exchange: Exchange,
+            routingKey: "product.updated");
+
+
+        await channel.QueueBindAsync(
+            queue: Queue,
+            exchange: Exchange,
+            routingKey: "product.deleted");
+
+
+        await channel.QueueBindAsync(
+            queue: Queue,
+            exchange: Exchange,
+            routingKey: "product.retry");
+
+
+
+        /*
+         * Consumer settings
+         */
+
+        await channel.BasicQosAsync(
+            prefetchSize: 0,
+            prefetchCount: 10,
+            global: false);
+
+
+
+        var consumer =
+            new AsyncEventingBasicConsumer(channel);
+
+
+
+        consumer.ReceivedAsync += async (_, args) =>
         {
             try
             {
-                var json = Encoding.UTF8.GetString(args.Body.ToArray());
+                var json =
+                    Encoding.UTF8.GetString(
+                        args.Body.ToArray());
 
-                var product = JsonSerializer.Deserialize<Product>(json);
+
+                var product =
+                    JsonSerializer.Deserialize<Product>(json);
+
+
 
                 logger.LogInformation(
-                    "Product received: Id={Id}, Name={Name}, Price={Price}, Category={CategoryName}",
-                    product?.Id,
-                    product?.Name,
-                    product?.Price,
-                    product?.CategoryName);
+                    "Processing product Id={Id}",
+                    product?.Id);
 
-                // todo - save product to database or perform other processing
-                
-                bool simulateError = true;
 
-                if (simulateError)
-                {
-                    throw new Exception("DB failed intentionally");
-                }
+
+                /*
+                 * כאן תהיה שמירה ל DB
+                 */
+
+                // סימולציה של תקלה
+                throw new Exception(
+                    "DB failed intentionally");
+
+
 
                 await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
@@ -93,22 +200,117 @@ public class ProductConsumerWork(
             {
                 logger.LogError(
                     ex,
-                    "Error processing product message");
+                    "Product processing failed");
 
-                await channel.BasicNackAsync(
-                    deliveryTag: args.DeliveryTag,
-                    multiple: false,
-                    requeue: false);
+
+                var retryCount =
+                    GetRetryCount(args);
+
+
+
+                logger.LogInformation(
+                    "Current retry count: {RetryCount}",
+                    retryCount);
+
+
+
+                if (retryCount < MaxRetries)
+                {
+                    /*
+                     * שליחה ל Retry Queue
+                     */
+
+                    var properties =
+                        new BasicProperties
+                        {
+                            Persistent = true,
+                            Headers =
+                                new Dictionary<string, object?>()
+                        };
+
+
+                    if (args.BasicProperties.Headers != null)
+                    {
+                        foreach (var header in args.BasicProperties.Headers)
+                        {
+                            properties.Headers[header.Key] =
+                                header.Value;
+                        }
+                    }
+
+
+                    properties.Headers["x-retry-count"] =
+                        retryCount + 1;
+
+
+
+                    await channel.BasicPublishAsync(
+                        exchange: RetryExchange,
+                        routingKey: "product.retry",
+                        mandatory: false,
+                        basicProperties: properties,
+                        body: args.Body);
+
+
+
+                    await channel.BasicAckAsync(
+                        deliveryTag: args.DeliveryTag,
+                        multiple: false);
+                }
+                else
+                {
+                    /*
+                     * מעבר ל Dead Letter Queue
+                     */
+
+                    logger.LogError(
+                        "Max retries reached. Sending to DLQ");
+
+
+                    await channel.BasicPublishAsync(
+                        exchange: DeadExchange,
+                        routingKey: "product.failed",
+                        mandatory: false,
+                        body: args.Body);
+
+
+
+                    await channel.BasicAckAsync(
+                        deliveryTag: args.DeliveryTag,
+                        multiple: false);
+                }
             }
         };
 
+
+
         await channel.BasicConsumeAsync(
-            _rabbitMqOptions.ProductsQueue,
-            false,
-            consumer);
+            queue: Queue,
+            autoAck: false,
+            consumer: consumer);
+
+
 
         await Task.Delay(
             Timeout.Infinite,
             stoppingToken);
+    }
+
+
+
+    private int GetRetryCount(
+        BasicDeliverEventArgs args)
+    {
+        if (args.BasicProperties.Headers == null)
+            return 0;
+
+
+        if (!args.BasicProperties.Headers.TryGetValue(
+            "x-retry-count",
+            out var value))
+            return 0;
+
+
+        return Convert.ToInt32(value);
     }
 }

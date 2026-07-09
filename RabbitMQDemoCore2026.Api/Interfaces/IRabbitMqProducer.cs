@@ -2,6 +2,6 @@
 {
     public interface IRabbitMqProducer
     {
-        Task PublishAsync<T>(string queue, T message);
+        Task PublishAsync<T>(string exchange, string routingKey, T message);
     }
 }
