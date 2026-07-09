@@ -1,4 +1,6 @@
-﻿using RabbitMQ.Client;
+﻿using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
+using RabbitMQDemoCore2026.Infrastructure.Configuration;
 using System.Text;
 using System.Text.Json;
 
@@ -8,12 +10,22 @@ public class RabbitMqProducer : IRabbitMqProducer
 {
     private readonly IConnection _connection;
 
-    public RabbitMqProducer(IConnection connection)
+    public RabbitMqProducer(IOptions<RabbitMqOptions> options)
     {
-        _connection = connection;
+        var config = options.Value;
+
+        var factory = new ConnectionFactory
+        {
+            HostName = config.HostName,
+            //Port = config.Port,
+            UserName = config.UserName,
+            Password = config.Password,
+            //VirtualHost = config.VirtualHost
+        };
+
+        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
     }
 
-    // 3. Fully async publishing method
     public async Task PublishAsync<T>(string queue, T message)
     {
         using var channel = await _connection.CreateChannelAsync();

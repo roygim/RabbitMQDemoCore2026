@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RabbitMQDemoCore2026.Domain\RabbitMQDemoCore2026.Domain.csproj" />
+    <ProjectReference Include="..\RabbitMQDemoCore2026.Infrastructure\RabbitMQDemoCore2026.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

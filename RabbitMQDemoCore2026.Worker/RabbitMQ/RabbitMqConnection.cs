@@ -1,4 +1,6 @@
-﻿using RabbitMQ.Client;
+﻿using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
+using RabbitMQDemoCore2026.Infrastructure.Configuration;
 
 namespace RabbitMQDemoCore2026.Worker.RabbitMQ;
 
@@ -8,13 +10,17 @@ public class RabbitMqConnection : IRabbitMqConnection
 
     private IConnection? _connection;
 
-    public RabbitMqConnection()
+    public RabbitMqConnection(IOptions<RabbitMqOptions> options)
     {
+        var settings = options.Value;
+
         _factory = new ConnectionFactory
         {
-            HostName = "localhost",
-            UserName = "admin",
-            Password = "admin123"
+            HostName = settings.HostName,
+            //Port = settings.Port,
+            UserName = settings.UserName,
+            Password = settings.Password,
+            //VirtualHost = settings.VirtualHost
         };
     }
 

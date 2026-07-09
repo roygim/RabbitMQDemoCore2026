@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQDemoCore2026.Domain.Entities;
+using RabbitMQDemoCore2026.Infrastructure.Configuration;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
@@ -12,15 +14,18 @@ namespace RabbitMQDemoCore2026.Worker;
 
 public class ProductConsumerWork(
     ILogger<ProductConsumerWork> logger,
+    IOptions<RabbitMqOptions> options,
     IRabbitMqConnection rabbitMq) : BackgroundService
 {
+    private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
+
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
         var channel = await rabbitMq.CreateChannelAsync();
 
         await channel.QueueDeclareAsync(
-            "products_queue",
+            _rabbitMqOptions.ProductsQueue,
             durable: true,
             exclusive: false,
             autoDelete: false);
@@ -62,7 +67,7 @@ public class ProductConsumerWork(
         };
 
         await channel.BasicConsumeAsync(
-            "products_queue",
+            _rabbitMqOptions.ProductsQueue,
             false,
             consumer);
 

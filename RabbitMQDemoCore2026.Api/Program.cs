@@ -1,4 +1,5 @@
 using RabbitMQ.Client;
+using RabbitMQDemoCore2026.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,15 +9,9 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-var factory = new ConnectionFactory
-{
-    HostName = "localhost",
-    UserName = "admin",
-    Password = "admin123"
-};
-IConnection connection = await factory.CreateConnectionAsync();
+builder.Services.Configure<RabbitMqOptions>(
+    builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 
-builder.Services.AddSingleton<IConnection>(connection);
 builder.Services.AddSingleton<IRabbitMqProducer, RabbitMqProducer>();
 builder.Services.AddSingleton<IProductsProducer, ProductsProducer>();
 
