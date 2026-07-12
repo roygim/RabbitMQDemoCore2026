@@ -35,7 +35,6 @@ public class ProductConsumerWork(
     {
         var channel = await rabbitMq.CreateChannelAsync();
 
-
         /*
          * Exchanges
          */
@@ -57,8 +56,6 @@ public class ProductConsumerWork(
             type: ExchangeType.Direct,
             durable: true);
 
-
-
         /*
          * Dead Letter Queue
          */
@@ -69,13 +66,10 @@ public class ProductConsumerWork(
             exclusive: false,
             autoDelete: false);
 
-
         await channel.QueueBindAsync(
             queue: DeadQueue,
             exchange: DeadExchange,
             routingKey: "product.failed");
-
-
 
         /*
          * Retry Queue
@@ -102,13 +96,10 @@ public class ProductConsumerWork(
                 }
             });
 
-
         await channel.QueueBindAsync(
             queue: RetryQueue,
             exchange: RetryExchange,
             routingKey: "product.retry");
-
-
 
         /*
          * Main Queue
@@ -144,8 +135,6 @@ public class ProductConsumerWork(
             exchange: Exchange,
             routingKey: "product.retry");
 
-
-
         /*
          * Consumer settings
          */
@@ -155,12 +144,8 @@ public class ProductConsumerWork(
             prefetchCount: 10,
             global: false);
 
-
-
         var consumer =
             new AsyncEventingBasicConsumer(channel);
-
-
 
         consumer.ReceivedAsync += async (_, args) =>
         {
@@ -170,17 +155,12 @@ public class ProductConsumerWork(
                     Encoding.UTF8.GetString(
                         args.Body.ToArray());
 
-
                 var product =
                     JsonSerializer.Deserialize<Product>(json);
-
-
 
                 logger.LogInformation(
                     "Processing product Id={Id}",
                     product?.Id);
-
-
 
                 /*
                  * כאן תהיה שמירה ל DB
@@ -189,8 +169,6 @@ public class ProductConsumerWork(
                 // סימולציה של תקלה
                 throw new Exception(
                     "DB failed intentionally");
-
-
 
                 await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
@@ -202,24 +180,16 @@ public class ProductConsumerWork(
                     ex,
                     "Product processing failed");
 
-
                 var retryCount =
                     GetRetryCount(args);
-
-
 
                 logger.LogInformation(
                     "Current retry count: {RetryCount}",
                     retryCount);
 
-
-
                 if (retryCount < MaxRetries)
                 {
-                    /*
-                     * שליחה ל Retry Queue
-                     */
-
+                    //send to retry queue
                     var properties =
                         new BasicProperties
                         {
@@ -227,7 +197,6 @@ public class ProductConsumerWork(
                             Headers =
                                 new Dictionary<string, object?>()
                         };
-
 
                     if (args.BasicProperties.Headers != null)
                     {
@@ -238,11 +207,8 @@ public class ProductConsumerWork(
                         }
                     }
 
-
                     properties.Headers["x-retry-count"] =
                         retryCount + 1;
-
-
 
                     await channel.BasicPublishAsync(
                         exchange: RetryExchange,
@@ -251,29 +217,21 @@ public class ProductConsumerWork(
                         basicProperties: properties,
                         body: args.Body);
 
-
-
                     await channel.BasicAckAsync(
                         deliveryTag: args.DeliveryTag,
                         multiple: false);
                 }
                 else
                 {
-                    /*
-                     * מעבר ל Dead Letter Queue
-                     */
-
+                    //send to dead letter queue
                     logger.LogError(
                         "Max retries reached. Sending to DLQ");
-
 
                     await channel.BasicPublishAsync(
                         exchange: DeadExchange,
                         routingKey: "product.failed",
                         mandatory: false,
                         body: args.Body);
-
-
 
                     await channel.BasicAckAsync(
                         deliveryTag: args.DeliveryTag,
@@ -282,21 +240,15 @@ public class ProductConsumerWork(
             }
         };
 
-
-
         await channel.BasicConsumeAsync(
             queue: Queue,
             autoAck: false,
             consumer: consumer);
 
-
-
         await Task.Delay(
             Timeout.Infinite,
             stoppingToken);
     }
-
-
 
     private int GetRetryCount(
         BasicDeliverEventArgs args)
