@@ -27,18 +27,15 @@ public class ProductConsumerWork(
     private const string DeadExchange = "products.dlx";
     private const string DeadQueue = "products_dead_queue";
 
-    private const int MaxRetries = 3;
-
+    private const int MaxAttempts = 3; // attempts is the original attempt + 2 retries
 
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
         var channel = await rabbitMq.CreateChannelAsync();
 
-        /*
-         * Exchanges
-         */
-
+        // Exchanges
+         
         await channel.ExchangeDeclareAsync(
             exchange: Exchange,
             type: ExchangeType.Topic,
@@ -56,9 +53,7 @@ public class ProductConsumerWork(
             type: ExchangeType.Direct,
             durable: true);
 
-        /*
-         * Dead Letter Queue
-         */
+        // Dead Letter Queue
 
         await channel.QueueDeclareAsync(
             queue: DeadQueue,
@@ -71,9 +66,7 @@ public class ProductConsumerWork(
             exchange: DeadExchange,
             routingKey: "product.failed");
 
-        /*
-         * Retry Queue
-         */
+        // Retry Queue
 
         await channel.QueueDeclareAsync(
             queue: RetryQueue,
@@ -101,43 +94,35 @@ public class ProductConsumerWork(
             exchange: RetryExchange,
             routingKey: "product.retry");
 
-        /*
-         * Main Queue
-         */
-
+        // Main Queue
+         
         await channel.QueueDeclareAsync(
             queue: Queue,
             durable: true,
             exclusive: false,
             autoDelete: false);
 
-
         await channel.QueueBindAsync(
             queue: Queue,
             exchange: Exchange,
             routingKey: "product.created");
-
 
         await channel.QueueBindAsync(
             queue: Queue,
             exchange: Exchange,
             routingKey: "product.updated");
 
-
         await channel.QueueBindAsync(
             queue: Queue,
             exchange: Exchange,
             routingKey: "product.deleted");
-
 
         await channel.QueueBindAsync(
             queue: Queue,
             exchange: Exchange,
             routingKey: "product.retry");
 
-        /*
-         * Consumer settings
-         */
+        // Consumer settings
 
         await channel.BasicQosAsync(
             prefetchSize: 0,
@@ -151,16 +136,13 @@ public class ProductConsumerWork(
         {
             try
             {
-                var json =
-                    Encoding.UTF8.GetString(
-                        args.Body.ToArray());
+                logger.LogInformation("Message received");
 
-                var product =
-                    JsonSerializer.Deserialize<Product>(json);
+                var json = Encoding.UTF8.GetString(args.Body.ToArray());
 
-                logger.LogInformation(
-                    "Processing product Id={Id}",
-                    product?.Id);
+                var product = JsonSerializer.Deserialize<Product>(json);
+
+                logger.LogInformation("Processing product Id={Id}", product?.Id);
 
                 /*
                  * כאן תהיה שמירה ל DB
@@ -176,18 +158,20 @@ public class ProductConsumerWork(
             }
             catch (Exception ex)
             {
-                logger.LogError(
-                    ex,
-                    "Product processing failed");
+                logger.LogError(ex, "Product processing failed");
 
-                var retryCount =
-                    GetRetryCount(args);
+                var retryCount = GetRetryCount(args);
+
+                // logger.LogInformation("Current retry count: {RetryCount}", retryCount);
+
+                var attemptNumber = retryCount + 1; 
 
                 logger.LogInformation(
-                    "Current retry count: {RetryCount}",
-                    retryCount);
+                    "Attempt {Attempt}/{MaxAttempts}",
+                    attemptNumber,
+                    MaxAttempts);
 
-                if (retryCount < MaxRetries)
+                if (attemptNumber < MaxAttempts)
                 {
                     //send to retry queue
                     var properties =
@@ -224,8 +208,7 @@ public class ProductConsumerWork(
                 else
                 {
                     //send to dead letter queue
-                    logger.LogError(
-                        "Max retries reached. Sending to DLQ");
+                    logger.LogError("Max retries reached. Sending to DLQ");
 
                     await channel.BasicPublishAsync(
                         exchange: DeadExchange,
@@ -256,12 +239,10 @@ public class ProductConsumerWork(
         if (args.BasicProperties.Headers == null)
             return 0;
 
-
         if (!args.BasicProperties.Headers.TryGetValue(
             "x-retry-count",
             out var value))
             return 0;
-
 
         return Convert.ToInt32(value);
     }
