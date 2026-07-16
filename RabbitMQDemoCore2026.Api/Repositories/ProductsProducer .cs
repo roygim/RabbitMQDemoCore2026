@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
+using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
 
 namespace RabbitMQDemoCore2026.Repositories
@@ -21,6 +22,14 @@ namespace RabbitMQDemoCore2026.Repositories
                 "products.exchange",
                 "product.created",
                 product);
+        }
+
+        public async Task PublishCreatedAsync(ProductCreatedEvent productCreatedEvent)
+        {
+            await _producer.PublishAsync(
+                "products.exchange",
+                "product.created",
+                productCreatedEvent);
         }
     }
 }

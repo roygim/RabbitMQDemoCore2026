@@ -8,6 +8,7 @@ using RabbitMQDemoCore2026.Infrastructure.Configuration;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
+using RabbitMQDemoCore2026.Domain.Events;
 
 namespace RabbitMQDemoCore2026.Worker;
 
@@ -19,7 +20,8 @@ public class ProductConsumerWork(
     private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
 
     private const string Exchange = "products.exchange";
-    private const string Queue = "products_queue";
+    //private const string Queue = "products_queue";
+    private const string Queue = "products.db.queue";
 
     private const string RetryExchange = "products.retry.exchange";
     private const string RetryQueue = "products_retry_queue";
@@ -105,22 +107,7 @@ public class ProductConsumerWork(
         await channel.QueueBindAsync(
             queue: Queue,
             exchange: Exchange,
-            routingKey: "product.created");
-
-        await channel.QueueBindAsync(
-            queue: Queue,
-            exchange: Exchange,
-            routingKey: "product.updated");
-
-        await channel.QueueBindAsync(
-            queue: Queue,
-            exchange: Exchange,
-            routingKey: "product.deleted");
-
-        await channel.QueueBindAsync(
-            queue: Queue,
-            exchange: Exchange,
-            routingKey: "product.retry");
+            routingKey: "product.*");
 
         // Consumer settings
 
@@ -140,9 +127,13 @@ public class ProductConsumerWork(
 
                 var json = Encoding.UTF8.GetString(args.Body.ToArray());
 
-                var product = JsonSerializer.Deserialize<Product>(json);
+                //var product = JsonSerializer.Deserialize<Product>(json);
+                var productEvent = JsonSerializer.Deserialize<ProductCreatedEvent>(json);
 
-                logger.LogInformation("Processing product Id={Id}", product?.Id);
+                logger.LogInformation(
+                    "Processing ProductCreatedEvent Id={Id}, Name={Name}",
+                    productEvent?.ProductId,
+                    productEvent?.Name);
 
                 /*
                  * כאן תהיה שמירה ל DB

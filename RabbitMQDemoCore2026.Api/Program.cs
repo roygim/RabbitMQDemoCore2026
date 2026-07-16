@@ -1,4 +1,6 @@
 using RabbitMQ.Client;
+using RabbitMQDemoCore2026.Api.Interfaces;
+using RabbitMQDemoCore2026.Api.Services;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +14,7 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 
+builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddSingleton<IRabbitMqProducer, RabbitMqProducer>();
 builder.Services.AddSingleton<IProductsProducer, ProductsProducer>();
 
