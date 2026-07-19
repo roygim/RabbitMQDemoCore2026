@@ -44,4 +44,16 @@ public class ProductService : IProductService
 
         await _producer.PublishUpdatedAsync(productUpdatedEvent);
     }
+
+    public async Task DeleteAsync(int id)
+    {
+        var productDeletedEvent = new ProductDeletedEvent
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAt = DateTime.UtcNow,
+            ProductId = id
+        };
+
+        await _producer.PublishDeletedAsync(productDeletedEvent);
+    }
 }

@@ -155,6 +155,20 @@ public class ProductsDbConsumer(
                             break;
                         }
 
+                    case ProductEventNames.Deleted:
+                        {
+                            var productEvent =
+                                JsonSerializer.Deserialize<ProductDeletedEvent>(json)
+                                ?? throw new Exception("Invalid message body");
+
+                            var handler = scope.ServiceProvider
+                                .GetRequiredService<ProductDeletedHandler>();
+
+                            await handler.HandleAsync(productEvent, stoppingToken);
+
+                            break;
+                        }
+
                     default:
                         logger.LogWarning(
                             "Unknown routing key: {RoutingKey}",

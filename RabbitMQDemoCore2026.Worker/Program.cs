@@ -14,6 +14,7 @@ builder.Services.AddHostedService<ProductsDbConsumer>();
 
 builder.Services.AddScoped<ProductCreatedHandler>();
 builder.Services.AddScoped<ProductUpdatedHandler>();
+builder.Services.AddScoped<ProductDeletedHandler>();
 
 var host = builder.Build();
 host.Run();

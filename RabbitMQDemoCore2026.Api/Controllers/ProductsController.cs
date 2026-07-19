@@ -58,5 +58,25 @@ namespace RabbitMQDemoCore2026.Controllers
                 });
             }
         }
+
+        [HttpDelete("delete/{id}")]
+        public async Task<IActionResult> Delete(
+             [FromRoute] int id)
+        {
+            try
+            {
+                await _productService.DeleteAsync(id);
+
+                return Accepted();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to process product request",
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

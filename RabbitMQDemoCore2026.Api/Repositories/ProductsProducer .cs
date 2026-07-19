@@ -32,5 +32,13 @@ namespace RabbitMQDemoCore2026.Repositories
                 ProductEventNames.Updated,
                 productUpdatedEvent);
         }
+
+        public async Task PublishDeletedAsync(ProductDeletedEvent productDeletedEvent)
+        {
+            await _producer.PublishAsync(
+                RabbitMqTopology.ProductsExchange,
+                ProductEventNames.Deleted,
+                productDeletedEvent);
+        }
     }
 }

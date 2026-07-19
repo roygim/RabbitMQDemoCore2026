@@ -7,5 +7,7 @@ namespace RabbitMQDemoCore2026.Interfaces
         Task PublishCreatedAsync(ProductCreatedEvent productCreatedEvent);
 
         Task PublishUpdatedAsync(ProductUpdatedEvent productUpdatedEvent);
+
+        Task PublishDeletedAsync(ProductDeletedEvent productDeletedEvent);
     }
 }

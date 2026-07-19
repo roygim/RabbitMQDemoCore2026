@@ -6,4 +6,5 @@ public interface IProductService
 {
     Task CreateAsync(CreateProductRequest request);
     Task UpdateAsync(int id, UpdateProductRequest request);
+    Task DeleteAsync(int id);
 }
