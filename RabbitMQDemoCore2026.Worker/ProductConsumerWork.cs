@@ -4,11 +4,12 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQDemoCore2026.Domain.Entities;
+using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
+using RabbitMQDemoCore2026.Infrastructure.Messaging;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
-using RabbitMQDemoCore2026.Domain.Events;
 
 namespace RabbitMQDemoCore2026.Worker;
 
@@ -18,15 +19,6 @@ public class ProductConsumerWork(
     IRabbitMqConnection rabbitMq) : BackgroundService
 {
     private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
-
-    private const string Exchange = "products.exchange";
-    private const string Queue = "products.db.queue";
-
-    private const string RetryExchange = "products.retry.exchange";
-    private const string RetryQueue = "products_retry_queue";
-
-    private const string DeadExchange = "products.dlx";
-    private const string DeadQueue = "products_dead_queue";
 
     private const int MaxAttempts = 3; // attempts is the original attempt + 2 retries
 
@@ -38,39 +30,39 @@ public class ProductConsumerWork(
         // Exchanges
          
         await channel.ExchangeDeclareAsync(
-            exchange: Exchange,
+            exchange: RabbitMqTopology.ProductsExchange,
             type: ExchangeType.Topic,
             durable: true);
 
 
         await channel.ExchangeDeclareAsync(
-            exchange: RetryExchange,
+            exchange: RabbitMqTopology.RetryExchange,
             type: ExchangeType.Direct,
             durable: true);
 
 
         await channel.ExchangeDeclareAsync(
-            exchange: DeadExchange,
+            exchange: RabbitMqTopology.DeadExchange,
             type: ExchangeType.Direct,
             durable: true);
 
         // Dead Letter Queue
 
         await channel.QueueDeclareAsync(
-            queue: DeadQueue,
+            queue: RabbitMqTopology.DeadQueue,
             durable: true,
             exclusive: false,
             autoDelete: false);
 
         await channel.QueueBindAsync(
-            queue: DeadQueue,
-            exchange: DeadExchange,
-            routingKey: "product.failed");
+            queue: RabbitMqTopology.DeadQueue,
+            exchange: RabbitMqTopology.DeadExchange,
+            routingKey: RabbitMqTopology.DeadRoutingKey);
 
         // Retry Queue
 
         await channel.QueueDeclareAsync(
-            queue: RetryQueue,
+            queue: RabbitMqTopology.RetryQueue,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -82,30 +74,30 @@ public class ProductConsumerWork(
                 },
                 {
                     "x-dead-letter-exchange",
-                    Exchange
+                    RabbitMqTopology.ProductsExchange
                 },
                 {
                     "x-dead-letter-routing-key",
-                    "product.retry"
+                    RabbitMqTopology.RetryRoutingKey
                 }
             });
 
         await channel.QueueBindAsync(
-            queue: RetryQueue,
-            exchange: RetryExchange,
-            routingKey: "product.retry");
+            queue: RabbitMqTopology.RetryQueue,
+            exchange: RabbitMqTopology.RetryExchange,
+            routingKey: RabbitMqTopology.RetryRoutingKey);
 
         // Main Queue
          
         await channel.QueueDeclareAsync(
-            queue: Queue,
+            queue: RabbitMqTopology.ProductsDbQueue,
             durable: true,
             exclusive: false,
             autoDelete: false);
 
         await channel.QueueBindAsync(
-            queue: Queue,
-            exchange: Exchange,
+            queue: RabbitMqTopology.ProductsDbQueue,
+            exchange: RabbitMqTopology.ProductsExchange,
             routingKey: "product.*");
 
         // Consumer settings
@@ -185,8 +177,8 @@ public class ProductConsumerWork(
                         retryCount + 1;
 
                     await channel.BasicPublishAsync(
-                        exchange: RetryExchange,
-                        routingKey: "product.retry",
+                        exchange: RabbitMqTopology.RetryExchange,
+                        routingKey: RabbitMqTopology.RetryRoutingKey,
                         mandatory: false,
                         basicProperties: properties,
                         body: args.Body);
@@ -200,10 +192,28 @@ public class ProductConsumerWork(
                     //send to dead letter queue
                     logger.LogError("Max retries reached. Sending to DLQ");
 
+                    var deadProperties =
+                        new BasicProperties
+                        {
+                            Persistent = true,
+                            Headers =
+                                new Dictionary<string, object?>()
+                        };
+
+                    if (args.BasicProperties.Headers != null)
+                    {
+                        foreach (var header in args.BasicProperties.Headers)
+                        {
+                            deadProperties.Headers[header.Key] =
+                                header.Value;
+                        }
+                    }
+
                     await channel.BasicPublishAsync(
-                        exchange: DeadExchange,
-                        routingKey: "product.failed",
+                        exchange: RabbitMqTopology.DeadExchange,
+                        routingKey: RabbitMqTopology.DeadRoutingKey,
                         mandatory: false,
+                        basicProperties: deadProperties,
                         body: args.Body);
 
                     await channel.BasicAckAsync(
@@ -214,7 +224,7 @@ public class ProductConsumerWork(
         };
 
         await channel.BasicConsumeAsync(
-            queue: Queue,
+            queue: RabbitMqTopology.ProductsDbQueue,
             autoAck: false,
             consumer: consumer);
 

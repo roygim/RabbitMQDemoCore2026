@@ -2,6 +2,7 @@
 using RabbitMQDemoCore2026.Domain.Constants;
 using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
+using RabbitMQDemoCore2026.Infrastructure.Messaging;
 
 namespace RabbitMQDemoCore2026.Repositories
 {
@@ -19,7 +20,7 @@ namespace RabbitMQDemoCore2026.Repositories
         public async Task PublishCreatedAsync(ProductCreatedEvent productCreatedEvent)
         {
             await _producer.PublishAsync(
-                "products.exchange",
+                RabbitMqTopology.ProductsExchange,
                 ProductEventNames.Created,
                 productCreatedEvent);
         }
