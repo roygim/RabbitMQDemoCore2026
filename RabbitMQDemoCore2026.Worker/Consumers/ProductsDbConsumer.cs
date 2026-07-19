@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQDemoCore2026.Domain.Constants;
 using RabbitMQDemoCore2026.Domain.Entities;
 using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
@@ -120,13 +121,46 @@ public class ProductsDbConsumer(
 
                 var json = Encoding.UTF8.GetString(args.Body.ToArray());
 
-                var productEvent = JsonSerializer.Deserialize<ProductCreatedEvent>(json);
+                var routingKey = GetOriginalRoutingKey(args);
 
                 using var scope = scopeFactory.CreateScope();
 
-                var handler = scope.ServiceProvider.GetRequiredService<ProductCreatedHandler>();
-                
-                await handler.HandleAsync(productEvent, stoppingToken);
+                switch (routingKey)
+                {
+                    case ProductEventNames.Created:
+                        {
+                            var productEvent =
+                                JsonSerializer.Deserialize<ProductCreatedEvent>(json)
+                                ?? throw new Exception("Invalid message body");
+
+                            var handler = scope.ServiceProvider
+                                .GetRequiredService<ProductCreatedHandler>();
+
+                            await handler.HandleAsync(productEvent, stoppingToken);
+
+                            break;
+                        }
+
+                    case ProductEventNames.Updated:
+                        {
+                            var productEvent =
+                                JsonSerializer.Deserialize<ProductUpdatedEvent>(json)
+                                ?? throw new Exception("Invalid message body");
+
+                            var handler = scope.ServiceProvider
+                                .GetRequiredService<ProductUpdatedHandler>();
+
+                            await handler.HandleAsync(productEvent, stoppingToken);
+
+                            break;
+                        }
+
+                    default:
+                        logger.LogWarning(
+                            "Unknown routing key: {RoutingKey}",
+                            routingKey);
+                        break;
+                }
 
                 await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
@@ -169,6 +203,11 @@ public class ProductsDbConsumer(
 
                     properties.Headers["x-retry-count"] =
                         retryCount + 1;
+
+                    if (!properties.Headers.ContainsKey("x-original-routing-key"))
+                    {
+                        properties.Headers["x-original-routing-key"] = args.RoutingKey;
+                    }
 
                     await channel.BasicPublishAsync(
                         exchange: RabbitMqTopology.RetryExchange,
@@ -227,17 +266,26 @@ public class ProductsDbConsumer(
             stoppingToken);
     }
 
-    private int GetRetryCount(
-        BasicDeliverEventArgs args)
+    private int GetRetryCount(BasicDeliverEventArgs args)
     {
         if (args.BasicProperties.Headers == null)
             return 0;
 
-        if (!args.BasicProperties.Headers.TryGetValue(
-            "x-retry-count",
-            out var value))
+        if (!args.BasicProperties.Headers.TryGetValue("x-retry-count", out var value))
             return 0;
 
         return Convert.ToInt32(value);
+    }
+
+    private string GetOriginalRoutingKey(BasicDeliverEventArgs args)
+    {
+        if (args.BasicProperties.Headers != null 
+            && args.BasicProperties.Headers.TryGetValue("x-original-routing-key", out var value) 
+            && value is byte[] bytes)
+        {
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        return args.RoutingKey;
     }
 }
