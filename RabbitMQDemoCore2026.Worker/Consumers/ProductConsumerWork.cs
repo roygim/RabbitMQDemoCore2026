@@ -12,10 +12,10 @@ using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
 
-namespace RabbitMQDemoCore2026.Worker;
+namespace RabbitMQDemoCore2026.Worker.Consumers;
 
-public class ProductConsumerWork(
-    ILogger<ProductConsumerWork> logger,
+public class ProductsDbConsumer(
+    ILogger<ProductsDbConsumer> logger,
     IOptions<RabbitMqOptions> options,
     IRabbitMqConnection rabbitMq,
     IServiceScopeFactory scopeFactory) : BackgroundService

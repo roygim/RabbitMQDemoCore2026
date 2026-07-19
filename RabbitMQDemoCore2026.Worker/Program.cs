@@ -1,5 +1,5 @@
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
-using RabbitMQDemoCore2026.Worker;
+using RabbitMQDemoCore2026.Worker.Consumers;
 using RabbitMQDemoCore2026.Worker.Handlers;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 
@@ -10,7 +10,7 @@ builder.Services.Configure<RabbitMqOptions>(
 
 builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
 
-builder.Services.AddHostedService<ProductConsumerWork>();
+builder.Services.AddHostedService<ProductsDbConsumer>();
 
 builder.Services.AddScoped<ProductCreatedHandler>();
 
