@@ -7,6 +7,7 @@ using RabbitMQDemoCore2026.Domain.Entities;
 using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
 using RabbitMQDemoCore2026.Infrastructure.Messaging;
+using RabbitMQDemoCore2026.Worker.Handlers;
 using RabbitMQDemoCore2026.Worker.RabbitMQ;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,8 @@ namespace RabbitMQDemoCore2026.Worker;
 public class ProductConsumerWork(
     ILogger<ProductConsumerWork> logger,
     IOptions<RabbitMqOptions> options,
-    IRabbitMqConnection rabbitMq) : BackgroundService
+    IRabbitMqConnection rabbitMq,
+    IServiceScopeFactory scopeFactory) : BackgroundService
 {
     private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
 
@@ -118,21 +120,13 @@ public class ProductConsumerWork(
 
                 var json = Encoding.UTF8.GetString(args.Body.ToArray());
 
-                //var product = JsonSerializer.Deserialize<Product>(json);
                 var productEvent = JsonSerializer.Deserialize<ProductCreatedEvent>(json);
 
-                logger.LogInformation(
-                    "Processing ProductCreatedEvent Id={Id}, Name={Name}",
-                    productEvent?.ProductId,
-                    productEvent?.Name);
+                using var scope = scopeFactory.CreateScope();
 
-                /*
-                 * כאן תהיה שמירה ל DB
-                 */
-
-                // סימולציה של תקלה
-                throw new Exception(
-                    "DB failed intentionally");
+                var handler = scope.ServiceProvider.GetRequiredService<ProductCreatedHandler>();
+                
+                await handler.HandleAsync(productEvent, stoppingToken);
 
                 await channel.BasicAckAsync(
                     deliveryTag: args.DeliveryTag,
