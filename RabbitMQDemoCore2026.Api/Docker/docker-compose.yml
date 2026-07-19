@@ -16,5 +16,23 @@
 
     restart: unless-stopped
 
+  postgres:
+    image: postgres:17
+    container_name: postgres
+
+    ports:
+      - "5432:5432"
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: products_db
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
+  postgres_data:
