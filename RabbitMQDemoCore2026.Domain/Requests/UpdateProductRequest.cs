@@ -1,6 +1,6 @@
 ﻿namespace RabbitMQDemoCore2026.Domain.Requests;
 
-public class CreateProductRequest
+public class UpdateProductRequest
 {
     public string Name { get; set; } = "";
 

@@ -1,6 +1,6 @@
 ﻿namespace RabbitMQDemoCore2026.Domain.Events;
 
-public class ProductCreatedEvent: EventBase
+public class ProductUpdatedEvent : EventBase
 {
     public int ProductId { get; init; }
 

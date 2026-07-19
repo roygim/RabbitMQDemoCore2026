@@ -37,5 +37,26 @@ namespace RabbitMQDemoCore2026.Controllers
                 });
             }            
         }
+
+        [HttpPut("update/{id}")]
+        public async Task<IActionResult> Update(
+            [FromRoute] int id,
+            [FromBody] UpdateProductRequest request)
+        {
+            try
+            {
+                await _productService.UpdateAsync(id, request);
+
+                return Accepted();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to process product request",
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

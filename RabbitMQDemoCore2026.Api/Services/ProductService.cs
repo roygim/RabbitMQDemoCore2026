@@ -16,25 +16,32 @@ public class ProductService : IProductService
     }
 
 
-    public async Task CreateAsync(
-        CreateProductRequest request)
+    public async Task CreateAsync(CreateProductRequest request)
     {
-        var productCreatedEvent =
-            new ProductCreatedEvent
+        var productCreatedEvent = new ProductCreatedEvent
             {
                 EventId = Guid.NewGuid(),
-
                 OccurredAt = DateTime.UtcNow,
-
                 ProductId = Random.Shared.Next(),
-
                 Name = request.Name,
-
                 Price = request.Price
             };
 
-
         await _producer.PublishCreatedAsync(
             productCreatedEvent);
+    }
+
+    public async Task UpdateAsync(int id, UpdateProductRequest request)
+    {
+        var productUpdatedEvent = new ProductUpdatedEvent
+            {
+                EventId = Guid.NewGuid(),
+                OccurredAt = DateTime.UtcNow,
+                ProductId = id,
+                Name = request.Name,
+                Price = request.Price
+            };
+
+        await _producer.PublishUpdatedAsync(productUpdatedEvent);
     }
 }

@@ -13,6 +13,7 @@ builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
 builder.Services.AddHostedService<ProductsDbConsumer>();
 
 builder.Services.AddScoped<ProductCreatedHandler>();
+builder.Services.AddScoped<ProductUpdatedHandler>();
 
 var host = builder.Build();
 host.Run();
