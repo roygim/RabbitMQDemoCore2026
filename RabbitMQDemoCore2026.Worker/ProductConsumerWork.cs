@@ -20,7 +20,6 @@ public class ProductConsumerWork(
     private readonly RabbitMqOptions _rabbitMqOptions = options.Value;
 
     private const string Exchange = "products.exchange";
-    //private const string Queue = "products_queue";
     private const string Queue = "products.db.queue";
 
     private const string RetryExchange = "products.retry.exchange";

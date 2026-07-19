@@ -18,25 +18,6 @@ namespace RabbitMQDemoCore2026.Controllers
             _productService = productService;
         }
 
-        //[HttpPost("add")]
-        //public async Task<IActionResult> Create([FromBody] Product product)
-        //{
-        //    try
-        //    {
-        //        await _productsProducer.PublishAsync(product);
-        //        return Ok();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new
-        //        {
-        //            error = "Failed to process product request",
-        //            message = ex.Message
-        //            // Optional: Include ex.StackTrace only in Development environment for security
-        //        });
-        //    }
-        //}
-
         [HttpPost("add")]
         public async Task<IActionResult> Create([FromBody] CreateProductRequest request)
         {

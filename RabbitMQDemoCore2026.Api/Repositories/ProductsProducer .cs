@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
+using RabbitMQDemoCore2026.Domain.Constants;
 using RabbitMQDemoCore2026.Domain.Events;
 using RabbitMQDemoCore2026.Infrastructure.Configuration;
 
@@ -15,20 +16,11 @@ namespace RabbitMQDemoCore2026.Repositories
             _options = options;
         }
 
-        public async Task PublishAsync(Product product)
-        {
-            //await _producer.PublishAsync(_options.Value.ProductsQueue, product);
-            await _producer.PublishAsync(
-                "products.exchange",
-                "product.created",
-                product);
-        }
-
         public async Task PublishCreatedAsync(ProductCreatedEvent productCreatedEvent)
         {
             await _producer.PublishAsync(
                 "products.exchange",
-                "product.created",
+                ProductEventNames.Created,
                 productCreatedEvent);
         }
     }
